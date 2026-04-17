@@ -11,10 +11,11 @@ Run with: python app.py
 import asyncio
 import os
 from config.config import MyConfig
-from totoms import ( TotoMicroservice, TotoMicroserviceConfiguration, TotoEnvironment, APIConfiguration, )
+from totoms import ( TotoMicroservice, TotoMicroserviceConfiguration, TotoEnvironment, APIConfiguration, AgentsConfiguration, )
 from totoms.TotoMicroservice import APIEndpoint, determine_environment
 
 from dlg.hello import say_hello
+from agent.suppie_agent import SuppieAgent
 
 def get_microservice_config() -> TotoMicroserviceConfiguration:
     """Create and return the microservice configuration."""
@@ -30,6 +31,9 @@ def get_microservice_config() -> TotoMicroserviceConfiguration:
             api_endpoints=[
                 APIEndpoint(method="GET", path="/hello", delegate=say_hello),
             ]
+        ),
+        agents_configuration=AgentsConfiguration(
+            agents=[SuppieAgent]
         ),
     )
 
