@@ -4,9 +4,10 @@ on:
   push:
     branches: 
       - 'release/**'
+      - 'main'
 
 env:
-  SERVICE_NAME: 'toto-ms-ex1'
+  SERVICE_NAME: 'agent-suppie'
   SERVICE_VERSION: '1.0.0'
   
 
