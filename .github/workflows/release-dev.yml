@@ -45,4 +45,4 @@ jobs:
     
     - name: Deploy image
       run: | 
-        gcloud run deploy ${{env.SERVICE_NAME}} --set-env-vars "HYPERSCALER=gcp,GCP_PID=${{ vars.GCP_PID }},BACKUP_BUCKET=${{ secrets.BACKUP_BUCKET }}" --service-account=${{ secrets.SERVICE_ACCOUNT }} --project=${{ vars.GCP_PID }} --image=europe-west1-docker.pkg.dev/${{ vars.GCP_PID }}/${{env.SERVICE_NAME}}/${{env.SERVICE_NAME}}:${{env.SERVICE_VERSION}} --platform=managed --region=europe-west1 --allow-unauthenticated --memory=1Gi 
+        gcloud run deploy ${{env.SERVICE_NAME}} --set-env-vars "HYPERSCALER=gcp,SERVICE_BASE_URL=${{ secrets.SERVICE_BASE_URL }},GALE_BROKER_URL=${{ secrets.GALE_BROKER_URL }},GCP_PID=${{ vars.GCP_PID }},BACKUP_BUCKET=${{ secrets.BACKUP_BUCKET }}" --service-account=${{ secrets.SERVICE_ACCOUNT }} --project=${{ vars.GCP_PID }} --image=europe-west1-docker.pkg.dev/${{ vars.GCP_PID }}/${{env.SERVICE_NAME}}/${{env.SERVICE_NAME}}:${{env.SERVICE_VERSION}} --platform=managed --region=europe-west1 --allow-unauthenticated --memory=1Gi 
