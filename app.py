@@ -20,10 +20,10 @@ from agent.suppie_agent import SuppieAgent
 def get_microservice_config() -> TotoMicroserviceConfiguration:
     """Create and return the microservice configuration."""
     return TotoMicroserviceConfiguration(
-        service_name="toto-ms-ex1",
-        base_path="/ex1",
+        service_name="suppie-agent",
+        base_path="/suppieagent",
         environment=TotoEnvironment(
-            hyperscaler=os.getenv("HYPERSCALER", "aws").lower(),
+            hyperscaler=os.getenv("HYPERSCALER", "gcp").lower(),
             hyperscaler_configuration=determine_environment()
         ),
         custom_config=MyConfig,

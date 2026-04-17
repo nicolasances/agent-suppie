@@ -19,6 +19,7 @@ from totoms.gale.agent.GaleConversationalAgent import GaleConversationalAgent
 from totoms.gale.model.AgentConversationMessage import AgentConversationMessage, StreamInfo
 from totoms.gale.model.AgentManifest import AgentManifest
 from totoms.model.TotoConfig import TotoControllerConfig
+from totoms.TotoLogger import TotoLogger
 
 from agent.tools import add_item_to_list, get_common_items
 
@@ -90,6 +91,11 @@ class SuppieAgent(GaleConversationalAgent):
         )
 
     async def on_message(self, message: AgentConversationMessage) -> AgentConversationMessage:
+        
+        logger = TotoLogger.get_instance()
+        
+        logger.log(message.conversation_id, f"Received message for agent {message.agent_id}: {message.message}")
+        
         stream_id = str(uuid.uuid4())
 
         # Acknowledge receipt while the LLM processes
@@ -104,6 +110,8 @@ class SuppieAgent(GaleConversationalAgent):
 
         result = self._agent.invoke({"messages": [("human", message.message)]})
         answer = result["messages"][-1].content
+        
+        logger.log(message.conversation_id, f"LLM response for agent {message.agent_id}: {answer}")
 
         # Return the final response
         return AgentConversationMessage(
