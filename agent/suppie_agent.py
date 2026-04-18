@@ -142,7 +142,7 @@ class SuppieAgent(GaleConversationalAgent):
             
             self._agent = create_agent(self._llm, all_tools, system_prompt=SYSTEM_PROMPT)
 
-        result = self._agent.invoke({"messages": [("human", message.message)]})
+        result = await self._agent.ainvoke({"messages": [("human", message.message)]})
         answer = result["messages"][-1].content
         
         logger.log(message.conversation_id, f"LLM response for agent {message.agent_id}: {answer}")
