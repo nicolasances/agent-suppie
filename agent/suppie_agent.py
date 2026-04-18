@@ -114,7 +114,7 @@ class SuppieAgent(GaleConversationalAgent):
 
         # Load MCP tools and build the agent once, then reuse
         if self._agent is None:
-            supermarket_url = os.environ.get("SUPERMARKET_API_ENDPOINT", "http://localhost:8080")
+            supermarket_url = os.environ.get("SUPERMARKET_API_ENDPOINT")
             
             logger.log(message.conversation_id, f"Loading MCP tools from {supermarket_url}/mcp")
             
