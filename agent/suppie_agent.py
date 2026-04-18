@@ -13,6 +13,7 @@ from typing import Optional
 from langchain.agents import create_agent
 from langchain_aws import ChatBedrock
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_mcp_adapters.client import MultiServerMCPClient
 
 from totoms.evt.TotoMessageBus import TotoMessageBus
 from totoms.gale.agent.GaleConversationalAgent import GaleConversationalAgent
@@ -21,7 +22,7 @@ from totoms.gale.model.AgentManifest import AgentManifest
 from totoms.model.TotoConfig import TotoControllerConfig
 from totoms.TotoLogger import TotoLogger
 
-from agent.tools import add_item_to_list, get_common_items
+from agent.tools import add_item_to_list
 
 
 SYSTEM_PROMPT = """
@@ -33,8 +34,6 @@ SYSTEM_PROMPT = """
 
     2.  Always avoid adding multiple times an item to the shopping list. Make sure that you are not creating duplicates before adding items to the shopping list.
 """
-
-TOOLS = [add_item_to_list, get_common_items]
 
 
 def _create_llm(hyperscaler: str):
@@ -84,8 +83,8 @@ class SuppieAgent(GaleConversationalAgent):
     def __init__(self, message_bus: Optional[TotoMessageBus], config: TotoControllerConfig):
         super().__init__(message_bus, config)
         hyperscaler = os.environ.get("HYPERSCALER", "aws").lower()
-        llm = _create_llm(hyperscaler)
-        self._agent = create_agent(llm, TOOLS, system_prompt=SYSTEM_PROMPT)
+        self._llm = _create_llm(hyperscaler)
+        self._agent = None  # Lazily initialized on first message
 
     def get_manifest(self) -> AgentManifest:
         return AgentManifest(
@@ -113,6 +112,24 @@ class SuppieAgent(GaleConversationalAgent):
             stream=StreamInfo(stream_id=stream_id, sequence_number=1, last=False),
         ))
 
+        # Load MCP tools and build the agent once, then reuse
+        if self._agent is None:
+            supermarket_url = os.environ.get("SUPERMARKET_MS_URL", "http://localhost:8080")
+            
+            logger.log(message.conversation_id, f"Loading MCP tools from {supermarket_url}/mcp")
+            
+            client = MultiServerMCPClient({
+                "supermarket": {
+                    "url": f"{supermarket_url}/mcp",
+                    "transport": "streamable_http",
+                }
+            })
+            
+            mcp_tools = await client.get_tools()
+            all_tools = [add_item_to_list] + mcp_tools
+            
+            self._agent = create_agent(self._llm, all_tools, system_prompt=SYSTEM_PROMPT)
+
         result = self._agent.invoke({"messages": [("human", message.message)]})
         answer = result["messages"][-1].content
         
@@ -127,3 +144,4 @@ class SuppieAgent(GaleConversationalAgent):
             actor="agent",
             stream=StreamInfo(stream_id=stream_id, sequence_number=2, last=True),
         )
+
