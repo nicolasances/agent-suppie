@@ -10,6 +10,7 @@ import os
 import uuid
 from typing import Optional
 
+from fastapi import Request
 from langchain.agents import create_agent
 from langchain_aws import ChatBedrock
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -85,6 +86,7 @@ class SuppieAgent(GaleConversationalAgent):
         hyperscaler = os.environ.get("HYPERSCALER", "aws").lower()
         self._llm = _create_llm(hyperscaler)
         self._agent = None  # Lazily initialized on first message
+        self._auth_header: Optional[str] = None
 
     def get_manifest(self) -> AgentManifest:
         return AgentManifest(
@@ -93,6 +95,11 @@ class SuppieAgent(GaleConversationalAgent):
             human_friendly_name="Suppie",
             description="Shopping-list assistant that helps you manage your supermarket list.",
         )
+
+    async def on_request(self, request: Request):
+        """Capture the Authorization header before delegating to the parent."""
+        self._auth_header = request.headers.get("Authorization")
+        return await super().on_request(request)
 
     async def on_message(self, message: AgentConversationMessage) -> AgentConversationMessage:
         
@@ -114,14 +121,19 @@ class SuppieAgent(GaleConversationalAgent):
 
         # Load MCP tools and build the agent once, then reuse
         if self._agent is None:
-            supermarket_url = os.environ.get("SUPERMARKET_MS_URL", "http://localhost:8080")
+            supermarket_url = os.environ.get("SUPERMARKET_API_ENDPOINT", "http://localhost:8080")
             
             logger.log(message.conversation_id, f"Loading MCP tools from {supermarket_url}/mcp")
+            
+            headers = {}
+            if self._auth_header:
+                headers["Authorization"] = self._auth_header
             
             client = MultiServerMCPClient({
                 "supermarket": {
                     "url": f"{supermarket_url}/mcp",
                     "transport": "streamable_http",
+                    "headers": headers,
                 }
             })
             
