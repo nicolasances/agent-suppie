@@ -22,17 +22,27 @@ from totoms.gale.model.AgentManifest import AgentManifest
 from totoms.model.TotoConfig import TotoControllerConfig
 from totoms.TotoLogger import TotoLogger
 
-from agent.tools import add_item_to_list
+from agent.tools import CommonItemsCache, create_get_common_items_tool
 
+# Only these MCP tools are used from toto-ms-supermarket.
+# Names are camelCase to match the identifiers exposed by the MCP server.
+_ALLOWED_MCP_TOOLS = {"addItemsToSupermarketList", "getSupermarketListItems"}
 
 SYSTEM_PROMPT = """
     You are an agent that helps the user manage their shopping list (supermarket list).
 
     Important rules to follow:
-    1.  When a user wants to add items to the shopping list, double check with the list of most common items used by the user.
-        If some terms in the items that the user wants to add are mispelled or look weird, double check the common items list and pick the one that has the highest potential of fitting what the user meant (e.g. closest matching).
+    1.  When a user wants to add items to the shopping list, first use the getCommonItems tool
+        to retrieve the list of known item names.  If any term the user provided appears
+        misspelled or unusual, find the closest matching name from that list and use it instead.
+        This is especially important for speech-to-text input that may contain misspelled
+        English, Danish, or Italian words.
 
-    2.  Always avoid adding multiple times an item to the shopping list. Make sure that you are not creating duplicates before adding items to the shopping list.
+    2.  Before adding any items, always retrieve the current shopping list using the
+        getSupermarketListItems tool.  Compare the items the user wants to add against the
+        existing list and skip any item that is already present.  Only call
+        addItemsToSupermarketList for the items that are genuinely new.
+        If some items were skipped because they were already in the list, inform the user.
 """
 
 
@@ -85,6 +95,7 @@ class SuppieAgent(GaleConversationalAgent):
         hyperscaler = os.environ.get("HYPERSCALER", "aws").lower()
         self._llm = _create_llm(hyperscaler)
         self._agent = None  # Lazily initialized on first message
+        self._common_items_cache = CommonItemsCache()
 
     def get_manifest(self) -> AgentManifest:
         return AgentManifest(
@@ -112,6 +123,9 @@ class SuppieAgent(GaleConversationalAgent):
             stream=StreamInfo(stream_id=stream_id, sequence_number=1, last=False),
         ))
 
+        # Propagate the current auth header to the cache so REST calls are authenticated
+        self._common_items_cache.set_auth_header(self._auth_header)
+
         # Load MCP tools and build the agent once, then reuse
         if self._agent is None:
             supermarket_url = os.environ.get("SUPERMARKET_API_ENDPOINT")
@@ -131,7 +145,14 @@ class SuppieAgent(GaleConversationalAgent):
             })
             
             mcp_tools = await client.get_tools()
-            all_tools = [add_item_to_list] + mcp_tools
+            # Only keep the MCP tools we actually need; exclude getCommonItems (handled locally)
+            filtered_mcp_tools = [t for t in mcp_tools if t.name in _ALLOWED_MCP_TOOLS]
+            skipped = [t.name for t in mcp_tools if t.name not in _ALLOWED_MCP_TOOLS]
+            if skipped:
+                logger.log(message.conversation_id, f"Filtered out MCP tools: {skipped}")
+
+            get_common_items = create_get_common_items_tool(self._common_items_cache)
+            all_tools = [get_common_items] + filtered_mcp_tools
             
             self._agent = create_agent(self._llm, all_tools, system_prompt=SYSTEM_PROMPT)
 
