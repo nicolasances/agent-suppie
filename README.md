@@ -1,4 +1,4 @@
-# agent-suppie
+# Agent Suppie
 
 **Suppie** is a conversational AI agent for the [Toto](https://github.com/nicolasances/toto) platform. It helps users manage their supermarket shopping list through natural-language conversation.
 
