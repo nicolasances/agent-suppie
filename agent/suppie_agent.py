@@ -157,7 +157,19 @@ class SuppieAgent(GaleConversationalAgent):
             self._agent = create_agent(self._llm, all_tools, system_prompt=SYSTEM_PROMPT)
 
         result = await self._agent.ainvoke({"messages": [("human", message.message)]})
-        answer = result["messages"][-1].content
+        raw_content = result["messages"][-1].content
+
+        if isinstance(raw_content, list):
+            text_blocks = [block for block in raw_content if isinstance(block, dict) and block.get("type") == "text"]
+            if text_blocks:
+                answer = text_blocks[0]["text"]
+            else:
+                logger.log(message.conversation_id, f"No text block found in LLM response for agent {message.agent_id}; falling back to raw content string")
+                answer = str(raw_content)
+            chain_of_thought = raw_content
+        else:
+            answer = raw_content
+            chain_of_thought = None
         
         logger.log(message.conversation_id, f"LLM response for agent {message.agent_id}: {answer}")
 
@@ -169,5 +181,6 @@ class SuppieAgent(GaleConversationalAgent):
             message=answer,
             actor="agent",
             stream=StreamInfo(stream_id=stream_id, sequence_number=2, last=True),
+            chain_of_thought=chain_of_thought,
         )
 
