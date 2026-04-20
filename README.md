@@ -1,53 +1,39 @@
-# Template for Toto Python Microservices
+# agent-suppie
 
-This is a template project that will allow you to create, build and deploy a Toto Microservice. <br>
-It supports two types of Runtime Environments: 
-* AWS on ECS
-* GCP on Cloud Run
+**Suppie** is a conversational AI agent for the [Toto](https://github.com/nicolasances/toto) platform. It helps users manage their supermarket shopping list through natural-language conversation.
 
-This documentation will guide you through the process of using this template to create, build and deploy your new Toto Microservice.
+## What it does
 
-## 1. Clone this Repo and Detach
-The first thing to do is to clone this repo. <br>
-You should change the name of the target folder with the following command: 
+Suppie receives messages from [Gale Broker](https://github.com/nicolasances/gale-broker), processes them using a LangChain agent, and returns responses via the Gale conversation protocol. It:
+
+- Adds items to the user's supermarket list, deduplicating against what's already there
+- Normalises item names using a known-items list (useful for speech-to-text input with misspellings in English, Danish, or Italian)
+- Exposes its chain-of-thought reasoning (thinking blocks) alongside the final text response
+
+## LLM support
+
+The LLM is selected via the `HYPERSCALER` environment variable:
+
+| Value | Provider | Model |
+|-------|----------|-------|
+| `aws` | AWS Bedrock | Claude (configurable via `BEDROCK_MODEL_ID`) |
+| `gcp` | Google Vertex AI | Gemini (configurable via `GEMINI_MODEL`) |
+
+Both providers are configured with extended thinking/reasoning enabled.
+
+## Tools
+
+Suppie uses two categories of tools:
+
+- **MCP tools** — `addItemsToSupermarketList` and `getSupermarketListItems`, served by [toto-ms-supermarket](https://github.com/nicolasances/toto-ms-supermarket) over Streamable HTTP.
+- **Local tools** — `getCommonItems`, a cached lookup of known item names used for normalisation.
+
+## Architecture
+
 ```
-git clone https://github.com/nicolasances/toto-python-ms-template toto-ms-<your-ms-name>
+Gale Broker → HTTP → SuppieAgent → LangChain agent → LLM (Bedrock / Gemini)
+                                         ↓
+                               MCP tools (toto-ms-supermarket)
 ```
 
-After cloning, you need to detach from the template repo. You can do this by using the following command: 
-```
-git remote rm origin
-```
-
-## 2. Create the Microservice
-Follow the instructions at the [Toto Microservice SDK repository](https://github.com/nicolasances/toto-microservice-sdk). 
-
-Remember, before doing anything, to **create a Python Virtual Environment**!
-```
-python -m venv .venv 
-source .venv/bin/activate.
-```
-For Windows: 
-```
-python -m venv .venv 
-.\.venv\Scripts\activate.ps
-```
-Always run `which python` to make sure you're now using the version of python in the venv.
-
-## 3. Deploy the Microservice
-* [Guide to Deploy on AWS ECS](./docs/aws/aws-ecs-guide.md)
-* [Guide to Deploy on GCP Cloud Run](./docs/gcp/config-gcp.md)
-
-## 4. Test that it works
-To test this, use Postman, and call with the following paramters:
-* HTTP Method: **`GET`**
-* URL: **https://<configured API domain>/**
-* Headers: 
-    * `toto-service`: <name of your microservice> (e.g. toto-ms-expenses)
-
-
-## 4. Troubleshooting and Known Errors
-### Error on urllib
-If you get the following error: 
-> ERROR: Cannot install -r requirements.txt (line 3) and urllib3==2.2.1 because these package versions have conflicting dependencies.
-Just remove urllib from `requirements.txt`
+Suppie extends `GaleConversationalAgent` from the [toto-microservice-sdk](https://github.com/nicolasances/toto-microservice-sdk) and is registered with Gale Broker via a manifest.
